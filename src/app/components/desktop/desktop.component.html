@@ -1,0 +1,144 @@
+<!-- Fondo con grid cyberpunk -->
+<div class="cyber-grid"></div>
+
+<!-- Scanline effect -->
+<div class="scanline" *ngIf="themeService.animationsEnabled()"></div>
+
+<!-- Partículas -->
+<div
+  *ngFor="let particle of particles()"
+  class="particle"
+  [class.active]="particle.active"
+  [style.left.px]="particle.x"
+  [style.top.px]="particle.y"
+></div>
+
+<!-- Toolbar -->
+<app-toolbar
+  [breadcrumb]="breadcrumb()"
+  (addNote)="onAddNote()"
+  (addFolder)="onAddFolder()"
+  (navigateTo)="onNavigateTo($event)"
+  (exportData)="onExportData()"
+  (importData)="onImportData()"
+  (toggleStructure)="onToggleStructure()"
+></app-toolbar>
+
+<!-- Input oculto para importar -->
+<input
+  #fileInput
+  type="file"
+  accept=".json"
+  style="display: none"
+  (change)="onFileSelected($event)"
+/>
+
+<!-- Área del escritorio -->
+<div
+  #desktopArea
+  class="desktop-area"
+  [class.transitioning]="isTransitioning()"
+  [class.transition-in]="transitionDirection() === 'in'"
+  [class.transition-out]="transitionDirection() === 'out'"
+  [class.connecting]="isConnecting()"
+>
+  <!-- Conexiones -->
+  <app-connections
+    [connections]="connections()"
+    [notes]="notes()"
+    [isDrawing]="isConnecting()"
+    [drawingFromId]="connectingFromId()"
+    [mousePosition]="mousePosition()"
+    (deleteConnection)="onDeleteConnection($event)"
+  ></app-connections>
+
+  <!-- Carpetas -->
+  <app-folder
+    *ngFor="let folder of folders(); trackBy: trackByFolder"
+    [folder]="folder"
+    [stats]="getFolderStats(folder.id)"
+    (folderOpen)="onFolderOpen(folder.id)"
+    (folderChange)="onFolderChange(folder.id, $event)"
+    (folderDelete)="onFolderDelete(folder.id)"
+  ></app-folder>
+
+  <!-- Notas -->
+  <app-note
+    *ngFor="let note of notes(); trackBy: trackByNote"
+    [note]="note"
+    [attr.data-note-id]="note.id"
+    (noteChange)="onNoteChange(note.id, $event)"
+    (noteDelete)="onNoteDelete(note.id)"
+    (noteFocus)="onNoteFocus(note.id)"
+    (connectionStart)="onStartConnection($event)"
+  ></app-note>
+
+  <!-- Indicador de modo conexión -->
+  <div class="connection-indicator" *ngIf="isConnecting()">
+    <span>Haz clic en otra nota para conectar</span>
+    <small>ESC para cancelar</small>
+  </div>
+
+  <!-- Estado vacío -->
+  <div class="empty-state" *ngIf="notes().length === 0 && folders().length === 0">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+      <polyline points="14 2 14 8 20 8"/>
+    </svg>
+    <h3 class="font-display">{{ currentDesktop()?.name }}</h3>
+    <p>Este escritorio está vacío</p>
+    <div class="empty-actions">
+      <button class="cyber-button" (click)="onAddNote()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="12" y1="5" x2="12" y2="19"/>
+          <line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+        Nueva nota
+      </button>
+      <button class="cyber-button" (click)="onAddFolder()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+        </svg>
+        Nueva carpeta
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Panel de estructura -->
+<div class="structure-panel cyber-panel" *ngIf="showStructure()">
+  <div class="structure-header">
+    <span class="font-display">ESTRUCTURA</span>
+    <button class="close-btn" (click)="onToggleStructure()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="18" y1="6" x2="6" y2="18"/>
+        <line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </button>
+  </div>
+  <div class="structure-content">
+    <ng-container *ngTemplateOutlet="desktopTree; context: { desktops: getDesktopChildren(null), level: 0 }"></ng-container>
+  </div>
+</div>
+
+<!-- Template recursivo para el árbol de escritorios -->
+<ng-template #desktopTree let-desktops="desktops" let-level="level">
+  <ng-container *ngFor="let desktop of desktops">
+    <div
+      class="structure-item"
+      [style.paddingLeft.px]="level * 16"
+      [class.active]="desktop.id === currentDesktop()?.id"
+      (click)="onNavigateTo(desktop.id)"
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path *ngIf="getDesktopChildren(desktop.id).length > 0" d="M3 7V17C3 18.1046 3.89543 19 5 19H19C20.1046 19 21 18.1046 21 17V9C21 7.89543 20.1046 7 19 7H12L10 5H5C3.89543 5 3 5.89543 3 7Z"/>
+        <rect *ngIf="getDesktopChildren(desktop.id).length === 0" x="3" y="3" width="18" height="18" rx="2"/>
+      </svg>
+      <span>{{ desktop.name }}</span>
+      <small>{{ storage.getDesktopStats(desktop.id).notes }} notas</small>
+    </div>
+    <ng-container *ngIf="getDesktopChildren(desktop.id).length > 0">
+      <ng-container *ngTemplateOutlet="desktopTree; context: { desktops: getDesktopChildren(desktop.id), level: level + 1 }"></ng-container>
+    </ng-container>
+  </ng-container>
+</ng-template>

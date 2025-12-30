@@ -1,0 +1,65 @@
+<div
+  class="folder"
+  [ngStyle]="folderStyle"
+  [class.dragging]="isDragging()"
+  (mousedown)="onDragStart($event)"
+  (dblclick)="onDoubleClick()"
+>
+  <!-- Icono de carpeta -->
+  <div class="folder-icon">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path d="M3 7V17C3 18.1046 3.89543 19 5 19H19C20.1046 19 21 18.1046 21 17V9C21 7.89543 20.1046 7 19 7H12L10 5H5C3.89543 5 3 5.89543 3 7Z"/>
+      <path d="M3 7H12" stroke-opacity="0.5"/>
+    </svg>
+
+    <!-- Indicador de contenido -->
+    <div class="folder-badge" *ngIf="stats.notes + stats.folders > 0">
+      {{ stats.notes + stats.folders }}
+    </div>
+  </div>
+
+  <!-- Nombre -->
+  <div class="folder-name" *ngIf="!isEditing()">
+    {{ folder.name }}
+  </div>
+  <input
+    *ngIf="isEditing()"
+    class="folder-name-input cyber-input"
+    [value]="folder.name"
+    (blur)="onNameBlur($event)"
+    (keydown)="onNameKeydown($event)"
+    (click)="$event.stopPropagation()"
+    (mousedown)="$event.stopPropagation()"
+    autofocus
+  />
+
+  <!-- Menú contextual -->
+  <button class="folder-menu-btn" (click)="toggleMenu($event)">
+    <svg viewBox="0 0 24 24" fill="currentColor">
+      <circle cx="12" cy="6" r="2"/>
+      <circle cx="12" cy="12" r="2"/>
+      <circle cx="12" cy="18" r="2"/>
+    </svg>
+  </button>
+
+  <div class="folder-menu" *ngIf="showMenu()">
+    <button (click)="onDoubleClick()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M5 12h14M12 5l7 7-7 7"/>
+      </svg>
+      Abrir
+    </button>
+    <button (click)="onRename()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+      </svg>
+      Renombrar
+    </button>
+    <button class="danger" (click)="onDelete()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+      </svg>
+      Eliminar
+    </button>
+  </div>
+</div>

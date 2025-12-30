@@ -1,0 +1,362 @@
+// ==================== MULTIDESKTOPFLOW - CYBERPUNK THEME ====================
+// Estilos globales con estética Cyberpunk/Matrix minimalista
+// Fuentes cargadas desde index.html
+
+// Variables CSS dinámicas (controladas desde Angular)
+:root {
+  --primary-color: #0d7337;
+  --primary-rgb: 13, 115, 55;
+  --glow-intensity: 0.7;
+  --bg-dark: #0a0a0a;
+  --bg-darker: #050505;
+  --bg-card: rgba(10, 10, 10, 0.85);
+  --border-color: rgba(var(--primary-rgb), 0.3);
+  --text-primary: #e0e0e0;
+  --text-secondary: #888;
+  --danger: #ff0040;
+  --warning: #ff6600;
+  --success: #00ff41;
+}
+
+// Reset y base
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: 'Share Tech Mono', monospace;
+  background: var(--bg-darker);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+// ==================== SCROLLBAR CYBERPUNK ====================
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-darker);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--primary-color);
+  border-radius: 3px;
+  opacity: 0.5;
+
+  &:hover {
+    background: var(--primary-color);
+    opacity: 0.8;
+  }
+}
+
+// ==================== SELECCIÓN DE TEXTO ====================
+::selection {
+  background: var(--primary-color);
+  color: var(--bg-dark);
+}
+
+// ==================== TIPOGRAFÍA ====================
+.font-display {
+  font-family: 'Orbitron', sans-serif;
+}
+
+.font-mono {
+  font-family: 'Share Tech Mono', monospace;
+}
+
+// ==================== EFECTOS GLOW ====================
+@mixin glow($color: var(--primary-color), $intensity: var(--glow-intensity)) {
+  box-shadow:
+    0 0 5px rgba(var(--primary-rgb), calc(0.3 * #{$intensity})),
+    0 0 10px rgba(var(--primary-rgb), calc(0.2 * #{$intensity})),
+    0 0 20px rgba(var(--primary-rgb), calc(0.1 * #{$intensity}));
+}
+
+@mixin text-glow($intensity: var(--glow-intensity)) {
+  text-shadow:
+    0 0 5px rgba(var(--primary-rgb), calc(0.5 * #{$intensity})),
+    0 0 10px rgba(var(--primary-rgb), calc(0.3 * #{$intensity}));
+}
+
+// ==================== CLASES UTILITARIAS ====================
+.glow {
+  @include glow();
+}
+
+.glow-text {
+  @include text-glow();
+}
+
+.glow-border {
+  border: 1px solid var(--primary-color);
+  @include glow();
+}
+
+.cyber-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  backdrop-filter: blur(10px);
+  border-radius: 4px;
+}
+
+.cyber-button {
+  font-family: 'Share Tech Mono', monospace;
+  background: transparent;
+  border: 1px solid var(--primary-color);
+  color: var(--primary-color);
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-radius: 2px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+
+  &:hover {
+    background: var(--primary-color);
+    color: var(--bg-dark);
+    @include glow();
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
+
+  &.danger {
+    border-color: var(--danger);
+    color: var(--danger);
+
+    &:hover {
+      background: var(--danger);
+      color: var(--bg-dark);
+    }
+  }
+
+  &.icon-only {
+    padding: 6px;
+    min-width: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+.cyber-input {
+  font-family: 'Share Tech Mono', monospace;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 8px 12px;
+  border-radius: 2px;
+  font-size: 14px;
+  transition: border-color 0.2s ease;
+
+  &:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    @include glow();
+  }
+
+  &::placeholder {
+    color: var(--text-secondary);
+  }
+}
+
+textarea.cyber-input {
+  resize: none;
+  min-height: 60px;
+}
+
+// ==================== ANIMACIONES ====================
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  92% { opacity: 1; }
+  93% { opacity: 0.8; }
+  94% { opacity: 1; }
+  96% { opacity: 0.9; }
+  97% { opacity: 1; }
+}
+
+@keyframes scanline {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100vh);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+// ==================== GRID BACKGROUND ====================
+.cyber-grid {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+
+  background-image:
+    linear-gradient(rgba(var(--primary-rgb), 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--primary-rgb), 0.03) 1px, transparent 1px);
+  background-size: 50px 50px;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: radial-gradient(
+      ellipse at center,
+      transparent 0%,
+      var(--bg-darker) 70%
+    );
+  }
+}
+
+// Scanline effect (sutil)
+.scanline {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgba(var(--primary-rgb), 0.1),
+    transparent
+  );
+  pointer-events: none;
+  z-index: 9999;
+  animation: scanline 8s linear infinite;
+}
+
+// ==================== DESTELLO PARTICLES ====================
+.particle {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  background: var(--primary-color);
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+
+  &.active {
+    animation: particle-flash 2s ease-out forwards;
+  }
+}
+
+@keyframes particle-flash {
+  0% {
+    opacity: 0;
+    transform: scale(0);
+  }
+  20% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+}
+
+// ==================== Z-INDEX LAYERS ====================
+.z-background { z-index: 0; }
+.z-desktop { z-index: 1; }
+.z-items { z-index: 10; }
+.z-notes { z-index: 100; }
+.z-dragging { z-index: 1000; }
+.z-toolbar { z-index: 2000; }
+.z-modal { z-index: 3000; }
+.z-overlay { z-index: 4000; }
+
+// ==================== ACCESIBILIDAD ====================
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+// ==================== TOOLTIP ====================
+.tooltip {
+  position: relative;
+
+  &::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 4px 8px;
+    background: var(--bg-dark);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    font-size: 11px;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.2s ease;
+    z-index: 9999;
+  }
+
+  &:hover::after {
+    opacity: 1;
+    visibility: visible;
+  }
+}

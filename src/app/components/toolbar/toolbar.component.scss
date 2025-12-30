@@ -1,0 +1,256 @@
+.toolbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  z-index: 2000;
+  border-radius: 0;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  background: rgba(5, 5, 5, 0.95);
+}
+
+// ==================== BREADCRUMB ====================
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  overflow-x: auto;
+  max-width: 60%;
+
+  &::-webkit-scrollbar {
+    height: 0;
+  }
+}
+
+.breadcrumb-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+
+  svg {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+  }
+
+  .separator {
+    width: 12px;
+    height: 12px;
+    opacity: 0.5;
+  }
+
+  &:hover {
+    color: var(--primary-color);
+  }
+
+  &.active {
+    color: var(--primary-color);
+    font-weight: 500;
+
+    span {
+      text-shadow: 0 0 5px rgba(var(--primary-rgb), 0.5);
+    }
+  }
+}
+
+// ==================== ACCIONES ====================
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.action-btn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+
+  svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  &:hover {
+    color: var(--primary-color);
+    border-color: var(--primary-color);
+    background: rgba(var(--primary-rgb), 0.1);
+  }
+}
+
+.separator-line {
+  width: 1px;
+  height: 24px;
+  background: var(--border-color);
+  margin: 0 4px;
+}
+
+// ==================== THEME PICKER ====================
+.theme-picker-container {
+  position: relative;
+}
+
+.theme-picker {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  background: var(--bg-dark);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 12px;
+  min-width: 200px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  z-index: 100;
+
+  animation: slideIn 0.2s ease-out;
+}
+
+.theme-picker-header {
+  font-size: 10px;
+  color: var(--primary-color);
+  margin-bottom: 10px;
+  letter-spacing: 2px;
+}
+
+.theme-colors {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.theme-color {
+  width: 28px;
+  height: 28px;
+  border: 2px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 10px currentColor;
+  }
+
+  &.active {
+    border-color: var(--text-primary);
+    box-shadow: 0 0 10px currentColor;
+  }
+}
+
+.glow-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    min-width: 40px;
+  }
+
+  input[type="range"] {
+    flex: 1;
+    height: 4px;
+    background: var(--border-color);
+    border-radius: 2px;
+    appearance: none;
+    cursor: pointer;
+
+    &::-webkit-slider-thumb {
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      background: var(--primary-color);
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 0 5px rgba(var(--primary-rgb), 0.5);
+    }
+  }
+}
+
+// ==================== MENU DROPDOWN ====================
+.menu-container {
+  position: relative;
+}
+
+.menu-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  background: var(--bg-dark);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  overflow: hidden;
+  min-width: 160px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  z-index: 100;
+
+  animation: slideIn 0.2s ease-out;
+
+  button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 14px;
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    cursor: pointer;
+    text-align: left;
+
+    svg {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+    }
+
+    &:hover {
+      background: var(--primary-color);
+      color: var(--bg-dark);
+
+      svg {
+        stroke: var(--bg-dark);
+      }
+    }
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

@@ -1,0 +1,347 @@
+.note {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  min-height: 150px;
+  transition: box-shadow 0.2s ease;
+
+  &:hover {
+    box-shadow:
+      0 0 10px rgba(var(--primary-rgb), 0.3),
+      0 0 20px rgba(var(--primary-rgb), 0.1);
+  }
+
+  &.dragging {
+    cursor: grabbing;
+    opacity: 0.9;
+    box-shadow:
+      0 0 20px rgba(var(--primary-rgb), 0.5),
+      0 10px 40px rgba(0, 0, 0, 0.5);
+  }
+
+  &.resizing {
+    opacity: 0.95;
+  }
+
+  &.minimized {
+    .note-content {
+      display: none;
+    }
+  }
+}
+
+// ==================== HEADER ====================
+.note-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-color);
+  cursor: grab;
+  user-select: none;
+  background: rgba(0, 0, 0, 0.3);
+
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+.note-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--primary-color);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: text;
+
+  &:hover {
+    text-shadow: 0 0 5px rgba(var(--primary-rgb), 0.5);
+  }
+}
+
+.note-title-input {
+  flex: 1;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 2px 4px;
+  margin-right: 8px;
+}
+
+.note-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.action-btn {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: 2px;
+  transition: all 0.2s ease;
+  padding: 4px;
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  &:hover {
+    color: var(--primary-color);
+    border-color: var(--primary-color);
+    background: rgba(var(--primary-rgb), 0.1);
+  }
+
+  &.danger:hover {
+    color: var(--danger);
+    border-color: var(--danger);
+    background: rgba(255, 0, 64, 0.1);
+  }
+}
+
+// ==================== CONTENT ====================
+.note-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.note-textarea {
+  flex: 1;
+  width: 100%;
+  min-height: 80px;
+  resize: vertical;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-y: auto;
+}
+
+// ==================== IMÁGENES ====================
+.note-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-height: 50%;
+  overflow-y: auto;
+}
+
+.note-image {
+  position: relative;
+  border: 1px solid var(--border-color);
+  border-radius: 2px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.3);
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+  }
+
+  &:hover {
+    border-color: var(--primary-color);
+
+    .image-menu-btn {
+      opacity: 1;
+    }
+  }
+}
+
+.image-menu-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  cursor: pointer;
+  border-radius: 2px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  font-size: 12px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+  }
+}
+
+.image-menu {
+  position: absolute;
+  top: 28px;
+  right: 4px;
+  background: var(--bg-dark);
+  border: 1px solid var(--border-color);
+  border-radius: 2px;
+  overflow: hidden;
+  z-index: 10;
+
+  button {
+    display: block;
+    width: 100%;
+    padding: 6px 12px;
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    text-align: left;
+    cursor: pointer;
+    white-space: nowrap;
+
+    &:hover {
+      background: var(--primary-color);
+      color: var(--bg-dark);
+    }
+  }
+}
+
+.image-resize-handle {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  cursor: se-resize;
+
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    width: 6px;
+    height: 6px;
+    border-right: 2px solid var(--primary-color);
+    border-bottom: 2px solid var(--primary-color);
+    opacity: 0.5;
+  }
+}
+
+// ==================== ADD IMAGE BUTTON ====================
+.add-image-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: 11px;
+  opacity: 0.7;
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  &:hover {
+    opacity: 1;
+  }
+}
+
+// ==================== RESIZE HANDLES ====================
+.resize-handle {
+  position: absolute;
+  background: transparent;
+
+  &.n, &.s {
+    left: 10px;
+    right: 10px;
+    height: 6px;
+    cursor: ns-resize;
+  }
+
+  &.e, &.w {
+    top: 10px;
+    bottom: 10px;
+    width: 6px;
+    cursor: ew-resize;
+  }
+
+  &.n { top: -3px; }
+  &.s { bottom: -3px; }
+  &.e { right: -3px; }
+  &.w { left: -3px; }
+
+  &.ne, &.nw, &.se, &.sw {
+    width: 12px;
+    height: 12px;
+  }
+
+  &.ne {
+    top: -3px;
+    right: -3px;
+    cursor: ne-resize;
+  }
+
+  &.nw {
+    top: -3px;
+    left: -3px;
+    cursor: nw-resize;
+  }
+
+  &.se {
+    bottom: -3px;
+    right: -3px;
+    cursor: se-resize;
+
+    &::after {
+      content: '';
+      position: absolute;
+      bottom: 5px;
+      right: 5px;
+      width: 6px;
+      height: 6px;
+      border-right: 2px solid var(--primary-color);
+      border-bottom: 2px solid var(--primary-color);
+      opacity: 0.3;
+    }
+  }
+
+  &.sw {
+    bottom: -3px;
+    left: -3px;
+    cursor: sw-resize;
+  }
+
+  &:hover::after {
+    opacity: 0.8;
+  }
+}
+
+// ==================== ANIMACIONES ====================
+@keyframes note-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+:host {
+  animation: note-appear 0.2s ease-out;
+}

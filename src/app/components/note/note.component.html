@@ -1,0 +1,130 @@
+<div
+  class="note cyber-panel"
+  [ngStyle]="noteStyle"
+  [class.dragging]="isDragging()"
+  [class.resizing]="isResizing()"
+  [class.minimized]="note.minimized"
+  (mousedown)="onDragStart($event)"
+  (dragover)="onDragOver($event)"
+  (drop)="onDrop($event)"
+>
+  <!-- Header -->
+  <div class="note-header">
+    <div class="note-title" *ngIf="!editingTitle()" (click)="onTitleClick()">
+      {{ note.title }}
+    </div>
+    <input
+      *ngIf="editingTitle()"
+      class="note-title-input cyber-input"
+      [value]="note.title"
+      (blur)="onTitleBlur($event)"
+      (keydown)="onTitleKeydown($event)"
+      autofocus
+    />
+
+    <div class="note-actions">
+      <button
+        class="action-btn tooltip"
+        data-tooltip="Conectar"
+        (click)="onStartConnection(); $event.stopPropagation()"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+          <polyline points="15 3 21 3 21 9"/>
+          <line x1="10" y1="14" x2="21" y2="3"/>
+        </svg>
+      </button>
+      <button
+        class="action-btn tooltip"
+        [attr.data-tooltip]="note.minimized ? 'Expandir' : 'Minimizar'"
+        (click)="toggleMinimize(); $event.stopPropagation()"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line *ngIf="!note.minimized" x1="5" y1="12" x2="19" y2="12"/>
+          <rect *ngIf="note.minimized" x="3" y="3" width="18" height="18" rx="2"/>
+        </svg>
+      </button>
+      <button
+        class="action-btn danger tooltip"
+        data-tooltip="Eliminar"
+        (click)="onDelete(); $event.stopPropagation()"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div class="note-content" *ngIf="!note.minimized">
+    <!-- Imágenes -->
+    <div class="note-images" *ngIf="note.images.length > 0">
+      <div
+        class="note-image"
+        *ngFor="let image of note.images"
+        [style.width.px]="image.size.width"
+        [style.height.px]="image.size.height"
+      >
+        <img [src]="image.data" [alt]="image.originalName || 'Imagen'" draggable="false"/>
+        <button
+          class="image-menu-btn"
+          (click)="toggleImageMenu(image.id, $event)"
+        >⋮</button>
+        <div class="image-menu" *ngIf="showImageMenu() === image.id">
+          <button (click)="onCopyImage(image)">Copiar</button>
+          <button (click)="onDeleteImage(image.id)">Eliminar</button>
+        </div>
+        <!-- Resize handle para imagen -->
+        <div
+          class="image-resize-handle"
+          (mousedown)="$event.stopPropagation()"
+        ></div>
+      </div>
+    </div>
+
+    <!-- Área de texto -->
+    <textarea
+      #contentArea
+      class="note-textarea cyber-input"
+      [value]="note.content"
+      placeholder="Escribe aquí..."
+      (focus)="onContentFocus()"
+      (blur)="onContentBlur()"
+      (input)="onContentChange($event)"
+      (paste)="onPaste($event)"
+      (mousedown)="$event.stopPropagation()"
+    ></textarea>
+
+    <!-- Botón agregar imagen -->
+    <button
+      class="add-image-btn cyber-button"
+      (click)="onAddImage(); $event.stopPropagation()"
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="18" height="18" rx="2"/>
+        <circle cx="8.5" cy="8.5" r="1.5"/>
+        <path d="M21 15l-5-5L5 21"/>
+      </svg>
+      Agregar imagen
+    </button>
+    <input
+      #fileInput
+      type="file"
+      accept="image/*"
+      style="display: none"
+      (change)="onFileSelected($event)"
+    />
+  </div>
+
+  <!-- Resize Handles -->
+  <div class="resize-handle n" (mousedown)="onResizeStart($event, 'n')"></div>
+  <div class="resize-handle s" (mousedown)="onResizeStart($event, 's')"></div>
+  <div class="resize-handle e" (mousedown)="onResizeStart($event, 'e')"></div>
+  <div class="resize-handle w" (mousedown)="onResizeStart($event, 'w')"></div>
+  <div class="resize-handle ne" (mousedown)="onResizeStart($event, 'ne')"></div>
+  <div class="resize-handle nw" (mousedown)="onResizeStart($event, 'nw')"></div>
+  <div class="resize-handle se" (mousedown)="onResizeStart($event, 'se')"></div>
+  <div class="resize-handle sw" (mousedown)="onResizeStart($event, 'sw')"></div>
+</div>
