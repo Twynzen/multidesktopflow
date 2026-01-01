@@ -321,8 +321,8 @@ export class AuthService {
     return translations[message] || message;
   }
 
-  // Check if can access app (either authenticated or offline mode)
+  // Check if can access app (must be authenticated, regardless of mode)
   canAccessApp(): boolean {
-    return this.isAuthenticated() || this.offlineMode();
+    return this.isAuthenticated();
   }
 }
