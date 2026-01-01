@@ -169,7 +169,7 @@ export class IndexedDBService {
     return workspace.id;
   }
 
-  async createWorkspace(name: string, isDefault = false): Promise<LocalWorkspace> {
+  async createWorkspace(name: string, isDefault = false, skipPendingChange = false): Promise<LocalWorkspace> {
     const workspace: LocalWorkspace = {
       id: this.generateId(),
       name,
@@ -184,7 +184,9 @@ export class IndexedDBService {
       updatedAt: new Date()
     };
     await this.db.workspaces.add(workspace);
-    await this.addPendingChange('create', 'workspace', workspace.id, workspace);
+    if (!skipPendingChange) {
+      await this.addPendingChange('create', 'workspace', workspace.id, workspace);
+    }
     return workspace;
   }
 
@@ -228,7 +230,7 @@ export class IndexedDBService {
     return desktop.id;
   }
 
-  async createDesktop(workspaceId: string, name: string, parentId: string | null = null): Promise<LocalDesktop> {
+  async createDesktop(workspaceId: string, name: string, parentId: string | null = null, skipPendingChange = false): Promise<LocalDesktop> {
     const desktop: LocalDesktop = {
       id: this.generateId(),
       workspaceId,
@@ -239,7 +241,9 @@ export class IndexedDBService {
       updatedAt: new Date()
     };
     await this.db.desktops.add(desktop);
-    await this.addPendingChange('create', 'desktop', desktop.id, desktop);
+    if (!skipPendingChange) {
+      await this.addPendingChange('create', 'desktop', desktop.id, desktop);
+    }
     return desktop;
   }
 

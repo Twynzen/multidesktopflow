@@ -125,7 +125,7 @@
               <polyline points="17 21 17 13 7 13 7 21"/>
               <polyline points="7 3 7 8 15 8"/>
             </svg>
-            💾 Guardar Partida
+            Guardar Partida
           </button>
           <button (click)="onLoadFromCloud()" [disabled]="authService.isOfflineMode()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -140,7 +140,7 @@
               <circle cx="12" cy="12" r="10"/>
               <polyline points="12 6 12 12 16 14"/>
             </svg>
-            📜 Historial de versiones
+            Historial de versiones
           </button>
         </div>
 
@@ -152,7 +152,7 @@
               <polyline points="7 10 12 15 17 10"/>
               <line x1="12" y1="15" x2="12" y2="3"/>
             </svg>
-            📦 Exportar como Mapa
+            Exportar como Mapa
           </button>
           <button (click)="onImportMapClick()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -160,7 +160,7 @@
               <polyline points="17 8 12 3 7 8"/>
               <line x1="12" y1="3" x2="12" y2="15"/>
             </svg>
-            📂 Importar Mapa
+            Importar Mapa
           </button>
         </div>
 
@@ -189,7 +189,10 @@
     <!-- User Menu -->
     <div class="user-menu-container">
       <button class="action-btn user-btn tooltip" data-tooltip="Usuario" (click)="toggleUserMenu()">
-        <span class="user-icon">👤</span>
+        <svg class="user-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+          <circle cx="12" cy="7" r="4"/>
+        </svg>
         <span class="user-name">{{ userName }}</span>
       </button>
 

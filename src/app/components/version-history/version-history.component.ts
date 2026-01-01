@@ -11,8 +11,19 @@ import { Version } from '../../models/database.model';
     <div class="version-history-overlay" (click)="close()">
       <div class="version-history-panel" (click)="$event.stopPropagation()">
         <div class="panel-header">
-          <h2>📜 Historial de Versiones</h2>
-          <button class="close-btn" (click)="close()">✕</button>
+          <h2>
+            <svg class="header-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+            Historial de Versiones
+          </h2>
+          <button class="close-btn" (click)="close()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
         </div>
 
         <div class="panel-content">
@@ -23,7 +34,10 @@ import { Version } from '../../models/database.model';
             </div>
           } @else if (versions().length === 0) {
             <div class="empty">
-              <span class="icon">📭</span>
+              <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/>
+                <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>
+              </svg>
               <p>No hay versiones guardadas</p>
               <small>Guarda tu primera partida para crear un punto de restauración</small>
             </div>
@@ -103,16 +117,31 @@ import { Version } from '../../models/database.model';
         margin: 0;
         font-size: 1.1rem;
         color: #e0e0e0;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+
+        .header-icon {
+          width: 20px;
+          height: 20px;
+          color: var(--primary-color, #0d7337);
+        }
       }
 
       .close-btn {
         background: none;
         border: none;
         color: #888;
-        font-size: 1.2rem;
         cursor: pointer;
         padding: 0.25rem;
         transition: color 0.2s;
+        display: flex;
+        align-items: center;
+
+        svg {
+          width: 18px;
+          height: 18px;
+        }
 
         &:hover {
           color: #fff;
@@ -148,11 +177,15 @@ import { Version } from '../../models/database.model';
       text-align: center;
       padding: 2rem;
       color: #888;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
 
-      .icon {
-        font-size: 2.5rem;
-        display: block;
-        margin-bottom: 0.5rem;
+      .empty-icon {
+        width: 48px;
+        height: 48px;
+        margin-bottom: 0.75rem;
+        opacity: 0.5;
       }
 
       p {

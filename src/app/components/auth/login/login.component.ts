@@ -52,7 +52,10 @@ export class LoginComponent {
     this.showPassword.update(v => !v);
   }
 
-  continueOffline(): void {
+  async continueOffline(): Promise<void> {
+    this.isLoading.set(true);
+    await this.authService.continueOffline();
+    this.isLoading.set(false);
     this.router.navigate(['/']);
   }
 

@@ -35,9 +35,14 @@ export class AuthService {
   private async initializeAuth(): Promise<void> {
     // Check if Supabase is configured
     if (!this.supabase.isConfigured()) {
-      console.log('Supabase not configured. Running in offline mode.');
+      console.log('Supabase not configured. Offline mode available.');
       this.offlineMode.set(true);
-      await this.initializeOfflineMode();
+      // Don't auto-login, just show login page with offline option
+      this.authState.set({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false
+      });
       return;
     }
 
@@ -75,31 +80,6 @@ export class AuthService {
         isLoading: false
       });
     }
-  }
-
-  private async initializeOfflineMode(): Promise<void> {
-    // In offline mode, create a default local user
-    const offlineUser: UserProfile = {
-      id: 'offline-user',
-      email: 'local@multidesktopflow.local',
-      displayName: 'Usuario Local',
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    // Ensure default workspace exists
-    let workspace = await this.indexedDB.getDefaultWorkspace();
-    if (!workspace) {
-      workspace = await this.indexedDB.createWorkspace('Mi Workspace', true);
-      // Create root desktop
-      await this.indexedDB.createDesktop(workspace.id, 'Escritorio Principal', null);
-    }
-
-    this.authState.set({
-      user: offlineUser,
-      isAuthenticated: true,
-      isLoading: false
-    });
   }
 
   private async fetchProfile(userId: string): Promise<UserProfile | null> {
@@ -196,6 +176,39 @@ export class AuthService {
     } catch (error) {
       console.error('Error signing out:', error);
     }
+  }
+
+  /**
+   * Continue in offline mode - explicitly called by user from login page
+   */
+  async continueOffline(): Promise<void> {
+    if (!this.offlineMode()) {
+      console.warn('continueOffline called but Supabase is configured');
+      return;
+    }
+
+    // Create offline user
+    const offlineUser: UserProfile = {
+      id: 'offline-user',
+      email: 'local@multidesktopflow.local',
+      displayName: 'Usuario Local',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    // Ensure default workspace exists (skip pending change tracking)
+    let workspace = await this.indexedDB.getDefaultWorkspace();
+    if (!workspace) {
+      workspace = await this.indexedDB.createWorkspace('Mi Workspace', true, true);
+      // Create root desktop (skip pending change tracking)
+      await this.indexedDB.createDesktop(workspace.id, 'Escritorio Principal', null, true);
+    }
+
+    this.authState.set({
+      user: offlineUser,
+      isAuthenticated: true,
+      isLoading: false
+    });
   }
 
   async resetPassword(email: string): Promise<{ success: boolean; error?: string }> {
