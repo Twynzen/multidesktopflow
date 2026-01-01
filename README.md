@@ -1,59 +1,103 @@
-# MultidesktopApp
+# MultiDesktopFlow
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 21.0.4.
+A cyberpunk-themed virtual desktop application for organizing notes, folders, and connections in a spatial interface.
 
-## Development server
+## Features
 
-To start a local development server, run:
+- **Virtual Desktops**: Create nested desktops to organize your work
+- **Notes**: Drag-and-drop notes with rich text content
+- **Folders**: Navigate between desktops using folder shortcuts
+- **Connections**: Link notes together visually
+- **Offline Mode**: Works without backend, data saved locally
+- **Cloud Sync**: Optional Supabase integration for cloud storage
+
+## Quick Start
+
+### 1. Install dependencies
+
+```bash
+npm install
+```
+
+### 2. Configure environment (Required for cloud features)
+
+```bash
+# Copy the example environment file
+cp .env.example .env
+
+# Edit .env with your Supabase credentials
+```
+
+Your `.env` file should contain:
+
+```env
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key-here
+```
+
+> **Note**: Without `.env` configuration, the app runs in **Offline Mode** - all data is stored locally in IndexedDB.
+
+### 3. Run the development server
 
 ```bash
 ng serve
 ```
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+Open [http://localhost:4200](http://localhost:4200) in your browser.
 
-## Code scaffolding
+## Environment Setup
 
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+### Getting Supabase Credentials
 
-```bash
-ng generate component component-name
+1. Create a project at [supabase.com](https://supabase.com)
+2. Go to Project Settings → API
+3. Copy the **Project URL** and **anon/public key**
+4. Add them to your `.env` file
+
+### Environment Files
+
+| File | Purpose | Git |
+|------|---------|-----|
+| `.env` | Your local credentials | Ignored |
+| `.env.example` | Template for developers | Committed |
+| `environment.ts` | Reads from `.env` via Vite | Committed |
+
+## Project Structure
+
+```
+src/
+├── app/
+│   ├── components/     # UI components
+│   │   ├── desktop/    # Main desktop workspace
+│   │   ├── toolbar/    # Top navigation bar
+│   │   └── auth/       # Login/Register
+│   ├── services/       # Business logic
+│   │   ├── auth.service.ts
+│   │   ├── supabase.service.ts
+│   │   └── indexeddb.service.ts
+│   └── models/         # TypeScript interfaces
+└── environments/       # Environment config
 ```
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+## Build
 
 ```bash
-ng generate --help
-```
+# Development
+ng serve
 
-## Building
-
-To build the project run:
-
-```bash
+# Production build
 ng build
+
+# Output: dist/multidesktop-app/
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
+## Tech Stack
 
-## Running unit tests
+- **Frontend**: Angular 21, TypeScript, SCSS
+- **Database**: Supabase (PostgreSQL) + IndexedDB (local)
+- **Build**: Vite (via Angular CLI)
+- **Styling**: Custom cyberpunk theme with CSS variables
 
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
+## License
 
-```bash
-ng test
-```
-
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
-
-```bash
-ng e2e
-```
-
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+MIT
