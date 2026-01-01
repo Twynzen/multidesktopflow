@@ -166,7 +166,14 @@ export class AuthService {
   }
 
   async signOut(): Promise<void> {
+    // In offline mode, just clear auth state and redirect
     if (this.offlineMode()) {
+      this.authState.set({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false
+      });
+      this.router.navigate(['/login']);
       return;
     }
 
