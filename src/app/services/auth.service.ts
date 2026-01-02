@@ -49,10 +49,10 @@ export class AuthService {
     // Listen to auth state changes
     this.supabase.onAuthStateChange(async (event, session) => {
       if (session?.user) {
-        const profile = await this.fetchProfile(session.user.id);
+        const profile = await this.fetchProfile(session.user.id, session.user.email);
         this.authState.set({
           user: profile,
-          isAuthenticated: true,
+          isAuthenticated: !!profile,
           isLoading: false
         });
       } else {
@@ -67,10 +67,10 @@ export class AuthService {
     // Check initial session
     const session = await this.supabase.getSession();
     if (session?.user) {
-      const profile = await this.fetchProfile(session.user.id);
+      const profile = await this.fetchProfile(session.user.id, session.user.email);
       this.authState.set({
         user: profile,
-        isAuthenticated: true,
+        isAuthenticated: !!profile,
         isLoading: false
       });
     } else {
@@ -82,7 +82,7 @@ export class AuthService {
     }
   }
 
-  private async fetchProfile(userId: string): Promise<UserProfile | null> {
+  private async fetchProfile(userId: string, email?: string): Promise<UserProfile | null> {
     try {
       const { data, error } = await this.supabase
         .from('profiles')
@@ -90,7 +90,14 @@ export class AuthService {
         .eq('id', userId)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        // Profile doesn't exist - try to create one
+        if (error.code === 'PGRST116' && email) {
+          console.log('Profile not found, creating one...');
+          return await this.createProfile(userId, email);
+        }
+        throw error;
+      }
 
       return {
         id: data.id,
@@ -106,9 +113,40 @@ export class AuthService {
     }
   }
 
+  private async createProfile(userId: string, email: string): Promise<UserProfile | null> {
+    try {
+      const now = new Date();
+      const { data, error } = await this.supabase
+        .from('profiles')
+        .insert({
+          id: userId,
+          email: email,
+          display_name: email.split('@')[0],
+          created_at: now.toISOString(),
+          updated_at: now.toISOString()
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return {
+        id: data.id,
+        email: data.email,
+        displayName: data.display_name,
+        avatarUrl: data.avatar_url,
+        createdAt: new Date(data.created_at),
+        updatedAt: new Date(data.updated_at)
+      };
+    } catch (error) {
+      console.error('Error creating profile:', error);
+      return null;
+    }
+  }
+
   // ==================== AUTH METHODS ====================
 
-  async signUp(email: string, password: string, displayName?: string): Promise<{ success: boolean; error?: string }> {
+  async signUp(email: string, password: string, displayName?: string): Promise<{ success: boolean; error?: string; needsEmailConfirmation?: boolean }> {
     if (this.offlineMode()) {
       return { success: false, error: 'Autenticación no disponible en modo offline' };
     }
@@ -123,20 +161,39 @@ export class AuthService {
         return { success: false, error: error.message };
       }
 
-      if (user) {
-        // Update display name if provided
-        if (displayName) {
+      // Check if we have a session (user is immediately logged in)
+      const session = await this.supabase.getSession();
+
+      if (session?.user) {
+        // User is logged in immediately (email confirmation disabled)
+        // First, ensure profile exists
+        let profile = await this.fetchProfile(session.user.id, session.user.email || email);
+
+        // Update displayName if provided
+        if (profile && displayName) {
           await this.supabase
             .from('profiles')
             .update({ display_name: displayName })
-            .eq('id', user.id);
+            .eq('id', session.user.id);
+          profile.displayName = displayName;
         }
 
-        // Create default workspace for new user
-        await this.createDefaultWorkspace(user.id);
-      }
+        // Create default workspace
+        await this.createDefaultWorkspace(session.user.id);
 
-      return { success: true };
+        // Update auth state
+        this.authState.set({
+          user: profile,
+          isAuthenticated: !!profile,
+          isLoading: false
+        });
+
+        return { success: true };
+      } else {
+        // Email confirmation is required
+        this.authState.update(state => ({ ...state, isLoading: false }));
+        return { success: true, needsEmailConfirmation: true };
+      }
     } catch (error: any) {
       this.authState.update(state => ({ ...state, isLoading: false }));
       return { success: false, error: error.message };
@@ -156,6 +213,20 @@ export class AuthService {
       if (error) {
         this.authState.update(state => ({ ...state, isLoading: false }));
         return { success: false, error: this.translateError(error.message) };
+      }
+
+      // Update auth state immediately after successful login
+      if (user) {
+        const profile = await this.fetchProfile(user.id, user.email || email);
+        this.authState.set({
+          user: profile,
+          isAuthenticated: !!profile,
+          isLoading: false
+        });
+
+        if (!profile) {
+          return { success: false, error: 'Error al cargar el perfil del usuario' };
+        }
       }
 
       return { success: true };

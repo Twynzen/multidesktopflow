@@ -67,10 +67,16 @@ export class RegisterComponent {
     this.isLoading.set(false);
 
     if (result.success) {
-      this.success.set('¡Cuenta creada exitosamente! Redirigiendo...');
-      setTimeout(() => {
-        this.router.navigate(['/']);
-      }, 1500);
+      if (result.needsEmailConfirmation) {
+        // Email confirmation required
+        this.success.set('¡Cuenta creada! Revisa tu email para confirmar tu cuenta y luego inicia sesión.');
+      } else {
+        // User is logged in immediately
+        this.success.set('¡Cuenta creada exitosamente! Redirigiendo...');
+        setTimeout(() => {
+          this.router.navigate(['/']);
+        }, 1500);
+      }
     } else {
       this.error.set(result.error || 'Error al crear la cuenta');
     }

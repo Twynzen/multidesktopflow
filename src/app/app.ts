@@ -1,11 +1,11 @@
 import { Component } from '@angular/core';
-import { DesktopComponent } from './components/desktop/desktop.component';
+import { RouterOutlet } from '@angular/router';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [DesktopComponent],
-  template: '<app-desktop></app-desktop>',
+  imports: [RouterOutlet],
+  template: '<router-outlet></router-outlet>',
   styles: [`
     :host {
       display: block;

@@ -1,8 +1,11 @@
 import { Injectable, signal, computed } from '@angular/core';
 import { SupabaseService } from './supabase.service';
-import { IndexedDBService, LocalWorkspace, LocalDesktop, LocalNote, LocalAsset, LocalFolder, LocalConnection } from './indexeddb.service';
+import { StorageService } from './storage.service';
 import { AuthService } from './auth.service';
 import { SyncStatus, SyncState, SyncResult } from '../models/database.model';
+import { AppState, Desktop, Note, Folder, Connection, NoteImage } from '../models/desktop.model';
+
+const STORAGE_KEY = 'multidesktop_data';
 
 @Injectable({
   providedIn: 'root'
@@ -25,132 +28,112 @@ export class SyncService {
 
   constructor(
     private supabase: SupabaseService,
-    private indexedDB: IndexedDBService,
+    private storage: StorageService,
     private auth: AuthService
-  ) {
-    this.initializeSync();
-  }
-
-  private async initializeSync(): Promise<void> {
-    // Update pending changes count periodically
-    setInterval(async () => {
-      const count = await this.indexedDB.getPendingChangesCount();
-      this.syncState.update(state => ({
-        ...state,
-        pendingChangesCount: count
-      }));
-    }, 5000);
-
-    // Initial count
-    const count = await this.indexedDB.getPendingChangesCount();
-    this.syncState.update(state => ({
-      ...state,
-      pendingChangesCount: count
-    }));
-  }
+  ) {}
 
   // ==================== MAIN SYNC METHODS ====================
 
   /**
-   * "Guardar Partida" - Push local changes to cloud
+   * "Guardar Partida" - Push localStorage data to Supabase
    */
   async saveToCloud(): Promise<SyncResult> {
     if (!this.supabase.isConfigured()) {
-      return {
-        success: false,
-        versionNumber: 0,
-        changesUploaded: 0,
-        assetsUploaded: 0,
-        timestamp: new Date(),
-        errors: ['Supabase no está configurado']
-      };
+      return this.errorResult(['Supabase no está configurado']);
     }
 
     const user = this.auth.currentUser();
     if (!user || this.auth.isOfflineMode()) {
-      return {
-        success: false,
-        versionNumber: 0,
-        changesUploaded: 0,
-        assetsUploaded: 0,
-        timestamp: new Date(),
-        errors: ['Usuario no autenticado']
-      };
+      return this.errorResult(['Usuario no autenticado']);
     }
 
     this.syncState.update(state => ({ ...state, status: 'syncing' }));
 
     try {
-      // Get default workspace
-      let workspace = await this.indexedDB.getDefaultWorkspace();
-      if (!workspace) {
-        throw new Error('No hay workspace local');
+      // Get current state from localStorage
+      const appState = this.storage.appState();
+
+      if (!appState || !appState.desktops || appState.desktops.length === 0) {
+        return this.errorResult(['No hay datos para sincronizar']);
       }
 
-      // Get all local data
-      const localData = await this.indexedDB.exportWorkspace(workspace.id);
+      // Get or create workspace in Supabase
+      const workspaceId = await this.getOrCreateWorkspace(user.id, appState.theme);
 
-      // Sync workspace
-      const workspaceResult = await this.syncWorkspace(workspace, user.id);
-      const remoteWorkspaceId = workspaceResult.id;
+      // Clear existing data in Supabase for this workspace
+      await this.clearRemoteWorkspaceData(workspaceId);
 
-      // Sync desktops
+      // Upload all desktops
       const desktopIdMap = new Map<string, string>();
-      for (const desktop of localData.desktops) {
-        const remoteId = await this.syncDesktop(desktop, remoteWorkspaceId, desktopIdMap);
+
+      // First pass: create all desktops to get their IDs
+      for (const desktop of appState.desktops) {
+        const remoteId = await this.uploadDesktop(desktop, workspaceId, null);
         desktopIdMap.set(desktop.id, remoteId);
       }
 
-      // Sync notes
-      const noteIdMap = new Map<string, string>();
-      for (const note of localData.notes) {
-        const remoteDesktopId = desktopIdMap.get(note.desktopId);
-        if (remoteDesktopId) {
-          const remoteId = await this.syncNote(note, remoteDesktopId);
-          noteIdMap.set(note.id, remoteId);
+      // Second pass: update parent relationships
+      for (const desktop of appState.desktops) {
+        if (desktop.parentId) {
+          const remoteId = desktopIdMap.get(desktop.id);
+          const remoteParentId = desktopIdMap.get(desktop.parentId);
+          if (remoteId && remoteParentId) {
+            await this.supabase
+              .from('desktops')
+              .update({ parent_id: remoteParentId })
+              .eq('id', remoteId);
+          }
         }
       }
 
-      // Sync assets
-      let assetsUploaded = 0;
-      for (const asset of localData.assets) {
-        const remoteNoteId = noteIdMap.get(asset.noteId);
-        if (remoteNoteId) {
-          await this.syncAsset(asset, remoteNoteId, user.id);
-          assetsUploaded++;
-        }
-      }
+      // Upload notes, folders, connections for each desktop
+      let totalNotes = 0;
+      let totalAssets = 0;
 
-      // Sync folders
-      for (const folder of localData.folders) {
-        const remoteDesktopId = desktopIdMap.get(folder.desktopId);
-        const remoteTargetId = desktopIdMap.get(folder.targetDesktopId);
-        if (remoteDesktopId && remoteTargetId) {
-          await this.syncFolder(folder, remoteDesktopId, remoteTargetId);
-        }
-      }
+      for (const desktop of appState.desktops) {
+        const remoteDesktopId = desktopIdMap.get(desktop.id);
+        if (!remoteDesktopId) continue;
 
-      // Sync connections
-      for (const connection of localData.connections) {
-        const remoteDesktopId = desktopIdMap.get(connection.desktopId);
-        const remoteFromNoteId = noteIdMap.get(connection.fromNoteId);
-        const remoteToNoteId = noteIdMap.get(connection.toNoteId);
-        if (remoteDesktopId && remoteFromNoteId && remoteToNoteId) {
-          await this.syncConnection(connection, remoteDesktopId, remoteFromNoteId, remoteToNoteId);
+        // Upload notes
+        const noteIdMap = new Map<string, string>();
+        for (const note of desktop.notes) {
+          const remoteNoteId = await this.uploadNote(note, remoteDesktopId);
+          noteIdMap.set(note.id, remoteNoteId);
+          totalNotes++;
+
+          // Upload images for this note
+          for (const image of note.images) {
+            await this.uploadImage(image, remoteNoteId, user.id);
+            totalAssets++;
+          }
+        }
+
+        // Upload folders
+        for (const folder of desktop.folders) {
+          const targetRemoteId = desktopIdMap.get(folder.desktopId);
+          if (targetRemoteId) {
+            await this.uploadFolder(folder, remoteDesktopId, targetRemoteId);
+          }
+        }
+
+        // Upload connections
+        for (const connection of desktop.connections) {
+          const fromRemoteId = noteIdMap.get(connection.fromNoteId);
+          const toRemoteId = noteIdMap.get(connection.toNoteId);
+          if (fromRemoteId && toRemoteId) {
+            await this.uploadConnection(connection, remoteDesktopId, fromRemoteId, toRemoteId);
+          }
         }
       }
 
       // Create version snapshot
-      const versionNumber = await this.createVersionSnapshot(remoteWorkspaceId, localData);
-
-      // Clear pending changes
-      await this.indexedDB.clearPendingChanges();
+      const versionNumber = await this.createVersionSnapshot(workspaceId, appState);
 
       const result: SyncResult = {
         success: true,
         versionNumber,
-        changesUploaded: localData.notes.length + localData.folders.length + localData.connections.length,
-        assetsUploaded,
+        changesUploaded: totalNotes + appState.desktops.length,
+        assetsUploaded: totalAssets,
         timestamp: new Date()
       };
 
@@ -162,7 +145,6 @@ export class SyncService {
         lastSyncedVersion: versionNumber
       }));
 
-      // Reset status after 3 seconds
       setTimeout(() => {
         this.syncState.update(state => ({ ...state, status: 'idle' }));
       }, 3000);
@@ -170,26 +152,17 @@ export class SyncService {
       return result;
     } catch (error: any) {
       console.error('Sync error:', error);
-
       this.syncState.update(state => ({
         ...state,
         status: 'error',
         error: error.message
       }));
-
-      return {
-        success: false,
-        versionNumber: 0,
-        changesUploaded: 0,
-        assetsUploaded: 0,
-        timestamp: new Date(),
-        errors: [error.message]
-      };
+      return this.errorResult([error.message]);
     }
   }
 
   /**
-   * Load data from cloud to local
+   * "Cargar Partida" - Download from Supabase to localStorage
    */
   async loadFromCloud(): Promise<boolean> {
     if (!this.supabase.isConfigured() || this.auth.isOfflineMode()) {
@@ -202,185 +175,177 @@ export class SyncService {
     this.syncState.update(state => ({ ...state, status: 'syncing' }));
 
     try {
-      // Get user's default workspace from Supabase
-      const { data: workspaces, error: wsError } = await this.supabase
+      // Get user's workspace from Supabase
+      const { data: workspace, error: wsError } = await this.supabase
         .from('workspaces')
         .select('*')
         .eq('user_id', user.id)
         .eq('is_default', true)
         .single();
 
-      if (wsError || !workspaces) {
-        // No remote workspace, nothing to load
+      if (wsError || !workspace) {
+        console.log('No remote workspace found');
         this.syncState.update(state => ({ ...state, status: 'idle' }));
-        return true;
+        return false;
       }
 
       // Get all desktops
-      const { data: desktops, error: dsError } = await this.supabase
+      const { data: remoteDesktops, error: dsError } = await this.supabase
         .from('desktops')
         .select('*')
-        .eq('workspace_id', workspaces.id);
+        .eq('workspace_id', workspace.id)
+        .order('position_order');
 
       if (dsError) throw dsError;
 
-      // Get all notes
-      const desktopIds = desktops?.map(d => d.id) || [];
-      let notes: any[] = [];
-      let assets: any[] = [];
-      let folders: any[] = [];
-      let connections: any[] = [];
+      if (!remoteDesktops || remoteDesktops.length === 0) {
+        console.log('No remote desktops found');
+        this.syncState.update(state => ({ ...state, status: 'idle' }));
+        return false;
+      }
 
-      if (desktopIds.length > 0) {
-        const { data: notesData } = await this.supabase
+      // Build the AppState from remote data
+      const desktops: Desktop[] = [];
+      const desktopIdMap = new Map<string, string>(); // remote -> local
+
+      // Create local IDs for each desktop
+      for (const rd of remoteDesktops) {
+        const localId = this.generateId();
+        desktopIdMap.set(rd.id, localId);
+      }
+
+      // Build desktops with their content
+      for (const rd of remoteDesktops) {
+        const localId = desktopIdMap.get(rd.id)!;
+        const localParentId = rd.parent_id ? desktopIdMap.get(rd.parent_id) || null : null;
+
+        // Get notes for this desktop
+        const { data: remoteNotes } = await this.supabase
           .from('notes')
           .select('*')
-          .in('desktop_id', desktopIds);
-        notes = notesData || [];
+          .eq('desktop_id', rd.id);
 
-        const { data: foldersData } = await this.supabase
-          .from('folders')
-          .select('*')
-          .in('desktop_id', desktopIds);
-        folders = foldersData || [];
+        const notes: Note[] = [];
+        const noteIdMap = new Map<string, string>(); // remote -> local
 
-        const { data: connectionsData } = await this.supabase
-          .from('connections')
-          .select('*')
-          .in('desktop_id', desktopIds);
-        connections = connectionsData || [];
+        for (const rn of remoteNotes || []) {
+          const localNoteId = this.generateId();
+          noteIdMap.set(rn.id, localNoteId);
 
-        // Get assets for notes
-        const noteIds = notes.map(n => n.id);
-        if (noteIds.length > 0) {
-          const { data: assetsData } = await this.supabase
+          // Get images for this note
+          const { data: remoteAssets } = await this.supabase
             .from('assets')
             .select('*')
-            .in('note_id', noteIds);
-          assets = assetsData || [];
-        }
-      }
+            .eq('note_id', rn.id);
 
-      // Clear local data and import from cloud
-      await this.indexedDB.clearAllData();
-
-      // Create local workspace
-      const localWorkspace = await this.indexedDB.createWorkspace(workspaces.name, true);
-
-      // Create local desktops
-      const desktopIdMap = new Map<string, string>();
-      for (const desktop of desktops || []) {
-        const localDesktop: LocalDesktop = {
-          id: this.generateId(),
-          workspaceId: localWorkspace.id,
-          parentId: desktop.parent_id ? desktopIdMap.get(desktop.parent_id) || null : null,
-          name: desktop.name,
-          positionOrder: desktop.position_order || 0,
-          createdAt: new Date(desktop.created_at),
-          updatedAt: new Date(desktop.updated_at),
-          syncedAt: new Date()
-        };
-        await this.indexedDB.saveDesktop(localDesktop);
-        desktopIdMap.set(desktop.id, localDesktop.id);
-      }
-
-      // Create local notes
-      const noteIdMap = new Map<string, string>();
-      for (const note of notes) {
-        const localDesktopId = desktopIdMap.get(note.desktop_id);
-        if (localDesktopId) {
-          const localNote: LocalNote = {
-            id: this.generateId(),
-            desktopId: localDesktopId,
-            title: note.title,
-            content: note.content || '',
-            positionX: note.position_x,
-            positionY: note.position_y,
-            width: note.width,
-            height: note.height,
-            color: note.color,
-            zIndex: note.z_index,
-            minimized: note.minimized,
-            createdAt: new Date(note.created_at),
-            updatedAt: new Date(note.updated_at),
-            syncedAt: new Date()
-          };
-          await this.indexedDB.saveNote(localNote);
-          noteIdMap.set(note.id, localNote.id);
-        }
-      }
-
-      // Create local folders
-      for (const folder of folders) {
-        const localDesktopId = desktopIdMap.get(folder.desktop_id);
-        const localTargetId = desktopIdMap.get(folder.target_desktop_id);
-        if (localDesktopId && localTargetId) {
-          const localFolder: LocalFolder = {
-            id: this.generateId(),
-            desktopId: localDesktopId,
-            targetDesktopId: localTargetId,
-            name: folder.name,
-            icon: folder.icon,
-            color: folder.color,
-            positionX: folder.position_x,
-            positionY: folder.position_y,
-            createdAt: new Date(folder.created_at),
-            syncedAt: new Date()
-          };
-          await this.indexedDB.saveFolder(localFolder);
-        }
-      }
-
-      // Create local connections
-      for (const connection of connections) {
-        const localDesktopId = desktopIdMap.get(connection.desktop_id);
-        const localFromId = noteIdMap.get(connection.from_note_id);
-        const localToId = noteIdMap.get(connection.to_note_id);
-        if (localDesktopId && localFromId && localToId) {
-          const localConnection: LocalConnection = {
-            id: this.generateId(),
-            desktopId: localDesktopId,
-            fromNoteId: localFromId,
-            toNoteId: localToId,
-            color: connection.color,
-            label: connection.label,
-            createdAt: new Date(connection.created_at),
-            syncedAt: new Date()
-          };
-          await this.indexedDB.saveConnection(localConnection);
-        }
-      }
-
-      // Download assets
-      for (const asset of assets) {
-        const localNoteId = noteIdMap.get(asset.note_id);
-        if (localNoteId && asset.storage_path) {
-          try {
-            const { data: blob } = await this.supabase.downloadFile('assets', asset.storage_path);
-            if (blob) {
-              const localAsset: LocalAsset = {
-                id: this.generateId(),
-                noteId: localNoteId,
-                data: blob,
-                originalName: asset.original_name,
-                mimeType: asset.mime_type,
-                width: asset.width,
-                height: asset.height,
-                positionX: asset.position_x,
-                positionY: asset.position_y,
-                createdAt: new Date(asset.created_at),
-                syncedAt: new Date()
-              };
-              await this.indexedDB.saveAsset(localAsset);
+          const images: NoteImage[] = [];
+          for (const ra of remoteAssets || []) {
+            if (ra.storage_path) {
+              try {
+                const { data: blob } = await this.supabase.downloadFile('assets', ra.storage_path);
+                if (blob) {
+                  const base64 = await this.blobToBase64(blob);
+                  images.push({
+                    id: this.generateId(),
+                    data: base64,
+                    originalName: ra.original_name,
+                    size: { width: ra.width || 100, height: ra.height || 100 },
+                    position: { x: ra.position_x || 0, y: ra.position_y || 0 }
+                  });
+                }
+              } catch (e) {
+                console.error('Error downloading image:', e);
+              }
             }
-          } catch (e) {
-            console.error('Error downloading asset:', e);
+          }
+
+          notes.push({
+            id: localNoteId,
+            title: rn.title || 'Sin título',
+            content: rn.content || '',
+            images,
+            position: { x: rn.position_x || 100, y: rn.position_y || 100 },
+            size: { width: rn.width || 300, height: rn.height || 200 },
+            color: rn.color,
+            zIndex: rn.z_index || 1,
+            minimized: rn.minimized || false,
+            createdAt: new Date(rn.created_at),
+            updatedAt: new Date(rn.updated_at)
+          });
+        }
+
+        // Get folders for this desktop
+        const { data: remoteFolders } = await this.supabase
+          .from('folders')
+          .select('*')
+          .eq('desktop_id', rd.id);
+
+        const folders: Folder[] = [];
+        for (const rf of remoteFolders || []) {
+          const targetLocalId = desktopIdMap.get(rf.target_desktop_id);
+          if (targetLocalId) {
+            folders.push({
+              id: this.generateId(),
+              name: rf.name,
+              icon: rf.icon,
+              position: { x: rf.position_x || 100, y: rf.position_y || 100 },
+              desktopId: targetLocalId,
+              color: rf.color
+            });
           }
         }
+
+        // Get connections for this desktop
+        const { data: remoteConnections } = await this.supabase
+          .from('connections')
+          .select('*')
+          .eq('desktop_id', rd.id);
+
+        const connections: Connection[] = [];
+        for (const rc of remoteConnections || []) {
+          const fromLocalId = noteIdMap.get(rc.from_note_id);
+          const toLocalId = noteIdMap.get(rc.to_note_id);
+          if (fromLocalId && toLocalId) {
+            connections.push({
+              id: this.generateId(),
+              fromNoteId: fromLocalId,
+              toNoteId: toLocalId,
+              color: rc.color
+            });
+          }
+        }
+
+        desktops.push({
+          id: localId,
+          name: rd.name || 'Escritorio',
+          parentId: localParentId,
+          notes,
+          folders,
+          connections,
+          createdAt: new Date(rd.created_at)
+        });
       }
 
-      // Clear pending changes since we just synced
-      await this.indexedDB.clearPendingChanges();
+      // Find root desktop (no parent) or first desktop
+      const rootDesktop = desktops.find(d => !d.parentId) || desktops[0];
+
+      // Build new AppState
+      const newState: AppState = {
+        desktops,
+        currentDesktopId: rootDesktop?.id || 'root',
+        theme: workspace.theme_config || {
+          primaryColor: '#0d7337',
+          glowIntensity: 0.7,
+          particlesEnabled: true,
+          animationsEnabled: true
+        }
+      };
+
+      // Save to localStorage
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
+
+      // Notify StorageService to reload from localStorage
+      this.storage.reloadFromStorage();
 
       this.syncState.update(state => ({
         ...state,
@@ -404,10 +369,9 @@ export class SyncService {
     }
   }
 
-  // ==================== SYNC HELPERS ====================
+  // ==================== HELPER METHODS ====================
 
-  private async syncWorkspace(workspace: LocalWorkspace, userId: string): Promise<{ id: string }> {
-    // Check if workspace exists in Supabase
+  private async getOrCreateWorkspace(userId: string, theme: any): Promise<string> {
     const { data: existing } = await this.supabase
       .from('workspaces')
       .select('id')
@@ -416,188 +380,185 @@ export class SyncService {
       .single();
 
     if (existing) {
-      // Update existing
       await this.supabase
         .from('workspaces')
         .update({
-          name: workspace.name,
-          theme_config: workspace.themeConfig,
+          theme_config: theme,
           updated_at: new Date().toISOString()
         })
         .eq('id', existing.id);
-      return { id: existing.id };
-    } else {
-      // Create new
-      const { data, error } = await this.supabase
-        .from('workspaces')
-        .insert({
-          user_id: userId,
-          name: workspace.name,
-          is_default: workspace.isDefault,
-          theme_config: workspace.themeConfig
-        })
-        .select('id')
-        .single();
-
-      if (error) throw error;
-      return { id: data.id };
+      return existing.id;
     }
-  }
-
-  private async syncDesktop(desktop: LocalDesktop, workspaceId: string, idMap: Map<string, string>): Promise<string> {
-    const parentId = desktop.parentId ? idMap.get(desktop.parentId) : null;
 
     const { data, error } = await this.supabase
-      .from('desktops')
-      .upsert({
-        workspace_id: workspaceId,
-        parent_id: parentId,
-        name: desktop.name,
-        position_order: desktop.positionOrder,
-        local_id: desktop.id
-      }, {
-        onConflict: 'local_id'
+      .from('workspaces')
+      .insert({
+        user_id: userId,
+        name: 'Mi Workspace',
+        is_default: true,
+        theme_config: theme
       })
       .select('id')
       .single();
 
-    if (error) {
-      // If upsert fails, try insert
-      const { data: insertData, error: insertError } = await this.supabase
-        .from('desktops')
-        .insert({
-          workspace_id: workspaceId,
-          parent_id: parentId,
-          name: desktop.name,
-          position_order: desktop.positionOrder,
-          local_id: desktop.id
-        })
-        .select('id')
-        .single();
-
-      if (insertError) throw insertError;
-      return insertData.id;
-    }
-
+    if (error) throw error;
     return data.id;
   }
 
-  private async syncNote(note: LocalNote, desktopId: string): Promise<string> {
+  private async clearRemoteWorkspaceData(workspaceId: string): Promise<void> {
+    // Get all desktop IDs
+    const { data: desktops } = await this.supabase
+      .from('desktops')
+      .select('id')
+      .eq('workspace_id', workspaceId);
+
+    if (desktops && desktops.length > 0) {
+      const desktopIds = desktops.map(d => d.id);
+
+      // Delete connections
+      await this.supabase
+        .from('connections')
+        .delete()
+        .in('desktop_id', desktopIds);
+
+      // Delete folders
+      await this.supabase
+        .from('folders')
+        .delete()
+        .in('desktop_id', desktopIds);
+
+      // Get all note IDs
+      const { data: notes } = await this.supabase
+        .from('notes')
+        .select('id')
+        .in('desktop_id', desktopIds);
+
+      if (notes && notes.length > 0) {
+        const noteIds = notes.map(n => n.id);
+
+        // Delete assets
+        await this.supabase
+          .from('assets')
+          .delete()
+          .in('note_id', noteIds);
+      }
+
+      // Delete notes
+      await this.supabase
+        .from('notes')
+        .delete()
+        .in('desktop_id', desktopIds);
+
+      // Delete desktops
+      await this.supabase
+        .from('desktops')
+        .delete()
+        .eq('workspace_id', workspaceId);
+    }
+  }
+
+  private async uploadDesktop(desktop: Desktop, workspaceId: string, parentId: string | null): Promise<string> {
+    const { data, error } = await this.supabase
+      .from('desktops')
+      .insert({
+        workspace_id: workspaceId,
+        parent_id: parentId,
+        name: desktop.name,
+        position_order: 0,
+        local_id: desktop.id
+      })
+      .select('id')
+      .single();
+
+    if (error) throw error;
+    return data.id;
+  }
+
+  private async uploadNote(note: Note, desktopId: string): Promise<string> {
     const { data, error } = await this.supabase
       .from('notes')
-      .upsert({
+      .insert({
         desktop_id: desktopId,
         title: note.title,
         content: note.content,
-        position_x: note.positionX,
-        position_y: note.positionY,
-        width: note.width,
-        height: note.height,
+        position_x: note.position.x,
+        position_y: note.position.y,
+        width: note.size.width,
+        height: note.size.height,
         color: note.color,
         z_index: note.zIndex,
         minimized: note.minimized,
         local_id: note.id
-      }, {
-        onConflict: 'local_id'
       })
       .select('id')
       .single();
 
-    if (error) {
-      const { data: insertData, error: insertError } = await this.supabase
-        .from('notes')
-        .insert({
-          desktop_id: desktopId,
-          title: note.title,
-          content: note.content,
-          position_x: note.positionX,
-          position_y: note.positionY,
-          width: note.width,
-          height: note.height,
-          color: note.color,
-          z_index: note.zIndex,
-          minimized: note.minimized,
-          local_id: note.id
-        })
-        .select('id')
-        .single();
-
-      if (insertError) throw insertError;
-      return insertData.id;
-    }
-
+    if (error) throw error;
     return data.id;
   }
 
-  private async syncAsset(asset: LocalAsset, noteId: string, userId: string): Promise<void> {
-    // Upload file to storage
-    const filePath = `${userId}/${asset.id}`;
-    const { error: uploadError } = await this.supabase.uploadFile(
-      'assets',
-      filePath,
-      asset.data,
-      { contentType: asset.mimeType, upsert: true }
-    );
+  private async uploadImage(image: NoteImage, noteId: string, userId: string): Promise<void> {
+    try {
+      // Convert base64 to blob
+      const blob = this.base64ToBlob(image.data);
+      const filePath = `${userId}/${image.id}`;
 
-    if (uploadError) throw uploadError;
-
-    // Save metadata to database
-    await this.supabase
-      .from('assets')
-      .upsert({
-        note_id: noteId,
-        storage_path: filePath,
-        original_name: asset.originalName,
-        mime_type: asset.mimeType,
-        width: asset.width,
-        height: asset.height,
-        position_x: asset.positionX,
-        position_y: asset.positionY,
-        local_id: asset.id
-      }, {
-        onConflict: 'local_id'
+      await this.supabase.uploadFile('assets', filePath, blob, {
+        contentType: this.getMimeType(image.data),
+        upsert: true
       });
+
+      await this.supabase
+        .from('assets')
+        .insert({
+          note_id: noteId,
+          storage_path: filePath,
+          original_name: image.originalName,
+          mime_type: this.getMimeType(image.data),
+          width: image.size.width,
+          height: image.size.height,
+          position_x: image.position.x,
+          position_y: image.position.y,
+          local_id: image.id
+        });
+    } catch (e) {
+      console.error('Error uploading image:', e);
+    }
   }
 
-  private async syncFolder(folder: LocalFolder, desktopId: string, targetDesktopId: string): Promise<void> {
+  private async uploadFolder(folder: Folder, desktopId: string, targetDesktopId: string): Promise<void> {
     await this.supabase
       .from('folders')
-      .upsert({
+      .insert({
         desktop_id: desktopId,
         target_desktop_id: targetDesktopId,
         name: folder.name,
         icon: folder.icon,
         color: folder.color,
-        position_x: folder.positionX,
-        position_y: folder.positionY,
+        position_x: folder.position.x,
+        position_y: folder.position.y,
         local_id: folder.id
-      }, {
-        onConflict: 'local_id'
       });
   }
 
-  private async syncConnection(
-    connection: LocalConnection,
+  private async uploadConnection(
+    connection: Connection,
     desktopId: string,
     fromNoteId: string,
     toNoteId: string
   ): Promise<void> {
     await this.supabase
       .from('connections')
-      .upsert({
+      .insert({
         desktop_id: desktopId,
         from_note_id: fromNoteId,
         to_note_id: toNoteId,
         color: connection.color,
-        label: connection.label,
         local_id: connection.id
-      }, {
-        onConflict: 'local_id'
       });
   }
 
-  private async createVersionSnapshot(workspaceId: string, data: any): Promise<number> {
-    // Get latest version number
+  private async createVersionSnapshot(workspaceId: string, appState: AppState): Promise<number> {
     const { data: latest } = await this.supabase
       .from('versions')
       .select('version_number')
@@ -608,16 +569,15 @@ export class SyncService {
 
     const versionNumber = (latest?.version_number ?? 0) + 1;
 
-    // Create summary
-    const summary = `${data.notes.length} notas, ${data.folders.length} carpetas, ${data.assets.length} imágenes`;
+    const totalNotes = appState.desktops.reduce((sum, d) => sum + d.notes.length, 0);
+    const summary = `${appState.desktops.length} escritorios, ${totalNotes} notas`;
 
-    // Save version
     await this.supabase
       .from('versions')
       .insert({
         workspace_id: workspaceId,
         version_number: versionNumber,
-        snapshot: JSON.stringify(data),
+        snapshot: JSON.stringify(appState),
         change_summary: summary
       });
 
@@ -628,14 +588,50 @@ export class SyncService {
     return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
+  private errorResult(errors: string[]): SyncResult {
+    return {
+      success: false,
+      versionNumber: 0,
+      changesUploaded: 0,
+      assetsUploaded: 0,
+      timestamp: new Date(),
+      errors
+    };
+  }
+
+  private base64ToBlob(base64: string): Blob {
+    const parts = base64.split(',');
+    const mimeMatch = parts[0].match(/:(.*?);/);
+    const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+    const bstr = atob(parts[1] || parts[0]);
+    const n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    for (let i = 0; i < n; i++) {
+      u8arr[i] = bstr.charCodeAt(i);
+    }
+    return new Blob([u8arr], { type: mime });
+  }
+
+  private async blobToBase64(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  private getMimeType(base64: string): string {
+    const match = base64.match(/data:([^;]+);/);
+    return match ? match[1] : 'image/png';
+  }
+
   // ==================== STATUS HELPERS ====================
 
   getStatusText(): string {
     switch (this.status()) {
       case 'idle':
-        return this.hasPendingChanges() ? `${this.pendingChangesCount()} cambios pendientes` : 'Sincronizado';
-      case 'pending':
-        return `${this.pendingChangesCount()} cambios pendientes`;
+        return 'Listo';
       case 'syncing':
         return 'Sincronizando...';
       case 'success':
@@ -650,9 +646,7 @@ export class SyncService {
   getStatusIcon(): string {
     switch (this.status()) {
       case 'idle':
-        return this.hasPendingChanges() ? '○' : '●';
-      case 'pending':
-        return '○';
+        return '●';
       case 'syncing':
         return '◐';
       case 'success':

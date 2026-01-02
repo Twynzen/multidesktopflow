@@ -54,7 +54,11 @@
             ],
             "styles": [
               "src/styles.scss"
-            ]
+            ],
+            "define": {
+              "import.meta.env.VITE_SUPABASE_URL": "\"https://mzgwipdaveyzgscnxlhj.supabase.co\"",
+              "import.meta.env.VITE_SUPABASE_ANON_KEY": "\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im16Z3dpcGRhdmV5emdzY254bGhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcyMDQ1ODksImV4cCI6MjA4Mjc4MDU4OX0._mFowmWKuBVbUymL-zgUtMGMBCw98nExNOIV2FTfq2Q\""
+            }
           },
           "configurations": {
             "production": {

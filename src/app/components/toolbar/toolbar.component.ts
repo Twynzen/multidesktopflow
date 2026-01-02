@@ -118,8 +118,12 @@ export class ToolbarComponent {
   async onLoadFromCloud(): Promise<void> {
     this.showMenu.set(false);
     if (confirm('¿Cargar datos desde la nube? Los cambios locales no guardados se perderán.')) {
-      await this.syncService.loadFromCloud();
-      window.location.reload();
+      const success = await this.syncService.loadFromCloud();
+      if (success) {
+        window.location.reload();
+      } else {
+        alert('No se encontraron datos en la nube para este usuario. Usa "Guardar en la nube" primero para crear una copia de seguridad.');
+      }
     }
   }
 

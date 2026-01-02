@@ -40,9 +40,10 @@
     margin-bottom: 0.5rem;
 
     .logo-icon {
-      font-size: 2rem;
+      width: 40px;
+      height: 40px;
       color: var(--primary-color, #0d7337);
-      text-shadow: 0 0 10px var(--primary-color, #0d7337);
+      filter: drop-shadow(0 0 10px var(--primary-color, #0d7337));
       animation: pulse 2s ease-in-out infinite;
     }
 
@@ -70,9 +71,11 @@
   border: 1px solid rgba(var(--primary-rgb, 13, 115, 55), 0.3);
 
   .icon {
-    font-size: 2rem;
+    width: 48px;
+    height: 48px;
     display: block;
-    margin-bottom: 0.5rem;
+    margin: 0 auto 0.5rem;
+    color: var(--primary-color, #0d7337);
   }
 
   p {
@@ -107,6 +110,8 @@
 
   .icon {
     flex-shrink: 0;
+    width: 18px;
+    height: 18px;
   }
 }
 
@@ -130,8 +135,11 @@
   .input-icon {
     position: absolute;
     left: 1rem;
-    font-size: 0.9rem;
+    width: 18px;
+    height: 18px;
     opacity: 0.5;
+    color: #888;
+    pointer-events: none;
   }
 
   input {
@@ -167,9 +175,14 @@
     border: none;
     padding: 0.5rem;
     cursor: pointer;
-    font-size: 1rem;
     opacity: 0.5;
     transition: opacity 0.2s;
+    color: #888;
+
+    svg {
+      width: 18px;
+      height: 18px;
+    }
 
     &:hover {
       opacity: 1;

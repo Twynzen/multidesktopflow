@@ -354,6 +354,13 @@ export class StorageService {
     this.state.set(this.loadState());
   }
 
+  /**
+   * Reload state from localStorage (used after sync operations)
+   */
+  reloadFromStorage(): void {
+    this.state.set(this.loadState());
+  }
+
   // ==================== UTILIDADES ====================
 
   private generateId(): string {
