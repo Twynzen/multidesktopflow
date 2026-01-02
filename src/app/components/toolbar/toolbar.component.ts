@@ -5,6 +5,7 @@ import { Router } from '@angular/router';
 import { ThemeService, ThemeColors } from '../../services/theme.service';
 import { AuthService } from '../../services/auth.service';
 import { SyncService } from '../../services/sync.service';
+import { StorageService } from '../../services/storage.service';
 import { MapService } from '../../services/map.service';
 import { Desktop } from '../../models/desktop.model';
 import { SyncIndicatorComponent } from '../sync-indicator/sync-indicator.component';
@@ -36,6 +37,7 @@ export class ToolbarComponent {
     public themeService: ThemeService,
     public authService: AuthService,
     public syncService: SyncService,
+    private storageService: StorageService,
     private mapService: MapService,
     private router: Router
   ) {}
@@ -118,10 +120,21 @@ export class ToolbarComponent {
   async onLoadFromCloud(): Promise<void> {
     this.showMenu.set(false);
     if (confirm('¿Cargar datos desde la nube? Los cambios locales no guardados se perderán.')) {
+      console.log('[Toolbar] 📥 Loading from cloud...');
       const success = await this.syncService.loadFromCloud();
+
       if (success) {
-        window.location.reload();
+        console.log('[Toolbar] ✅ Cloud data loaded successfully');
+        // Navigate to root desktop instead of reloading the page
+        // This prevents auth state loss and black screen issues
+        const rootDesktop = this.storageService.desktops().find(d => !d.parentId);
+        if (rootDesktop) {
+          console.log('[Toolbar] 🏠 Navigating to root desktop:', rootDesktop.id);
+          this.navigateTo.emit(rootDesktop.id);
+        }
+        alert('Datos cargados exitosamente desde la nube.');
       } else {
+        console.log('[Toolbar] ⚠️ No cloud data found');
         alert('No se encontraron datos en la nube para este usuario. Usa "Guardar en la nube" primero para crear una copia de seguridad.');
       }
     }

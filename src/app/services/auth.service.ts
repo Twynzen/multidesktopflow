@@ -33,71 +33,137 @@ export class AuthService {
   }
 
   private async initializeAuth(): Promise<void> {
-    // Check if Supabase is configured
-    if (!this.supabase.isConfigured()) {
-      console.log('Supabase not configured. Offline mode available.');
-      this.offlineMode.set(true);
-      // Don't auto-login, just show login page with offline option
-      this.authState.set({
-        user: null,
-        isAuthenticated: false,
-        isLoading: false
-      });
-      return;
-    }
+    console.log('[AuthService] 🚀 initializeAuth() started');
 
-    // Listen to auth state changes
-    this.supabase.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        const profile = await this.fetchProfile(session.user.id, session.user.email);
-        this.authState.set({
-          user: profile,
-          isAuthenticated: !!profile,
-          isLoading: false
-        });
-      } else {
+    try {
+      // Check if Supabase is configured
+      if (!this.supabase.isConfigured()) {
+        console.log('[AuthService] ⚠️ Supabase not configured. Offline mode available.');
+        this.offlineMode.set(true);
         this.authState.set({
           user: null,
           isAuthenticated: false,
           isLoading: false
         });
+        console.log('[AuthService] ✅ Offline mode set, isLoading: false');
+        return;
       }
-    });
 
-    // Check initial session
-    const session = await this.supabase.getSession();
-    if (session?.user) {
-      const profile = await this.fetchProfile(session.user.id, session.user.email);
-      this.authState.set({
-        user: profile,
-        isAuthenticated: !!profile,
-        isLoading: false
+      console.log('[AuthService] 📡 Supabase is configured, setting up auth listener...');
+
+      // Listen to auth state changes
+      this.supabase.onAuthStateChange(async (event, session) => {
+        console.log(`[AuthService] 🔔 onAuthStateChange event: ${event}`, { hasSession: !!session, hasUser: !!session?.user });
+
+        try {
+          if (session?.user) {
+            console.log(`[AuthService] 👤 User found in session: ${session.user.email}`);
+            const profile = await this.fetchProfile(session.user.id, session.user.email);
+            console.log('[AuthService] 📋 Profile fetched:', { hasProfile: !!profile, displayName: profile?.displayName });
+
+            this.authState.set({
+              user: profile,
+              isAuthenticated: !!profile,
+              isLoading: false
+            });
+            console.log('[AuthService] ✅ Auth state updated from listener, isAuthenticated:', !!profile);
+          } else {
+            console.log('[AuthService] 👻 No user in session from listener');
+            this.authState.set({
+              user: null,
+              isAuthenticated: false,
+              isLoading: false
+            });
+            console.log('[AuthService] ✅ Auth state cleared from listener');
+          }
+        } catch (listenerError) {
+          console.error('[AuthService] ❌ Error in onAuthStateChange listener:', listenerError);
+          this.authState.set({
+            user: null,
+            isAuthenticated: false,
+            isLoading: false
+          });
+        }
       });
-    } else {
+
+      // Check initial session
+      console.log('[AuthService] 🔍 Checking initial session...');
+      const session = await this.supabase.getSession();
+      console.log('[AuthService] 📦 Initial session result:', { hasSession: !!session, hasUser: !!session?.user });
+
+      if (session?.user) {
+        console.log(`[AuthService] 👤 User found: ${session.user.email}, fetching profile...`);
+        const profile = await this.fetchProfile(session.user.id, session.user.email);
+        console.log('[AuthService] 📋 Profile result:', { hasProfile: !!profile, displayName: profile?.displayName });
+
+        this.authState.set({
+          user: profile,
+          isAuthenticated: !!profile,
+          isLoading: false
+        });
+        console.log('[AuthService] ✅ Auth initialized with user, isAuthenticated:', !!profile);
+      } else {
+        console.log('[AuthService] 👻 No initial session found');
+        this.authState.set({
+          user: null,
+          isAuthenticated: false,
+          isLoading: false
+        });
+        console.log('[AuthService] ✅ Auth initialized without user');
+      }
+    } catch (error) {
+      console.error('[AuthService] ❌ CRITICAL ERROR in initializeAuth:', error);
+      // ALWAYS set isLoading to false to prevent infinite loading
       this.authState.set({
         user: null,
         isAuthenticated: false,
         isLoading: false
       });
+      console.log('[AuthService] 🔧 Recovered from error, isLoading set to false');
     }
+
+    console.log('[AuthService] 🏁 initializeAuth() completed. Final state:', {
+      isLoading: this.isLoading(),
+      isAuthenticated: this.isAuthenticated(),
+      hasUser: !!this.currentUser()
+    });
   }
 
   private async fetchProfile(userId: string, email?: string): Promise<UserProfile | null> {
+    console.log(`[AuthService] 🔍 fetchProfile() called for userId: ${userId}`);
+
     try {
-      const { data, error } = await this.supabase
+      console.log('[AuthService] 📡 Querying profiles table...');
+
+      // Add timeout to prevent infinite hanging
+      const PROFILE_TIMEOUT_MS = 5000;
+      const profilePromise = this.supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single();
 
+      const timeoutPromise = new Promise<{ data: null; error: { code: string; message: string } }>((resolve) => {
+        setTimeout(() => {
+          console.error('[AuthService] ⏰ Profile query TIMEOUT after 5 seconds!');
+          resolve({ data: null, error: { code: 'TIMEOUT', message: 'Profile query timed out' } });
+        }, PROFILE_TIMEOUT_MS);
+      });
+
+      const { data, error } = await Promise.race([profilePromise, timeoutPromise]);
+
       if (error) {
-        // Profile doesn't exist - try to create one
-        if (error.code === 'PGRST116' && email) {
-          console.log('Profile not found, creating one...');
+        console.log('[AuthService] ⚠️ Profile query error:', { code: error.code, message: error.message });
+
+        // Profile doesn't exist OR timeout - try to create one
+        if ((error.code === 'PGRST116' || error.code === 'TIMEOUT') && email) {
+          console.log('[AuthService] 📝 Profile not found or timeout, creating new profile...');
           return await this.createProfile(userId, email);
         }
         throw error;
       }
+
+      console.log('[AuthService] ✅ Profile found:', { id: data.id, email: data.email, displayName: data.display_name });
 
       return {
         id: data.id,
@@ -107,28 +173,65 @@ export class AuthService {
         createdAt: new Date(data.created_at),
         updatedAt: new Date(data.updated_at)
       };
-    } catch (error) {
-      console.error('Error fetching profile:', error);
+    } catch (error: any) {
+      console.error('[AuthService] ❌ Error fetching profile:', {
+        message: error?.message,
+        code: error?.code,
+        details: error?.details,
+        hint: error?.hint
+      });
+      // Return a minimal profile from auth data so user can still access the app
+      if (email) {
+        console.log('[AuthService] 🔧 Creating fallback profile from auth data');
+        return {
+          id: userId,
+          email: email,
+          displayName: email.split('@')[0],
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+      }
       return null;
     }
   }
 
   private async createProfile(userId: string, email: string): Promise<UserProfile | null> {
+    console.log(`[AuthService] 📝 createProfile() called for: ${email}`);
+    const displayName = email.split('@')[0];
+
     try {
       const now = new Date();
-      const { data, error } = await this.supabase
+      console.log('[AuthService] 📡 Inserting new profile...');
+
+      // Add timeout to prevent infinite hanging
+      const CREATE_TIMEOUT_MS = 5000;
+      const createPromise = this.supabase
         .from('profiles')
         .insert({
           id: userId,
           email: email,
-          display_name: email.split('@')[0],
+          display_name: displayName,
           created_at: now.toISOString(),
           updated_at: now.toISOString()
         })
         .select()
         .single();
 
-      if (error) throw error;
+      const timeoutPromise = new Promise<{ data: null; error: { code: string; message: string } }>((resolve) => {
+        setTimeout(() => {
+          console.error('[AuthService] ⏰ Create profile TIMEOUT after 5 seconds!');
+          resolve({ data: null, error: { code: 'TIMEOUT', message: 'Create profile timed out' } });
+        }, CREATE_TIMEOUT_MS);
+      });
+
+      const { data, error } = await Promise.race([createPromise, timeoutPromise]);
+
+      if (error) {
+        console.error('[AuthService] ❌ Error inserting profile:', { code: error.code, message: error.message });
+        throw error;
+      }
+
+      console.log('[AuthService] ✅ Profile created successfully:', { id: data.id, displayName: data.display_name });
 
       return {
         id: data.id,
@@ -138,9 +241,21 @@ export class AuthService {
         createdAt: new Date(data.created_at),
         updatedAt: new Date(data.updated_at)
       };
-    } catch (error) {
-      console.error('Error creating profile:', error);
-      return null;
+    } catch (error: any) {
+      console.error('[AuthService] ❌ Error creating profile:', {
+        message: error?.message,
+        code: error?.code,
+        details: error?.details
+      });
+      // Return fallback profile so user can access the app
+      console.log('[AuthService] 🔧 Returning fallback profile');
+      return {
+        id: userId,
+        email: email,
+        displayName: displayName,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
     }
   }
 
